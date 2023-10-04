@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "DeepFriedMarshmallow"
-version = "1.0.0dev1"
+version = "1.0.0dev2"
 description = "A JIT implementation for Marshmallow to speed up dumping and loading objects"
 authors = ["Maciej Wilczynski <oss@lupin.rocks>", "Roy Williams <rwilliams@lyft.com>"]
 readme = "README.md"
