@@ -2,7 +2,7 @@ from marshmallow import Schema, ValidationError
 
 from .jit import JitContext, generate_deserialize_method, generate_serialize_method
 
-__version__ = "1.0.0dev2"
+__version__ = "1.0.0dev3"
 
 
 class JitMethodWrapper:
