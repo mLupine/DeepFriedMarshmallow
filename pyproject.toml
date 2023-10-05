@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "DeepFriedMarshmallow"
-version = "1.0.0dev5"
+version = "1.0.0dev6"
 description = "A JIT implementation for Marshmallow to speed up data serialization and deserialization"
 authors = ["Maciej Wilczynski <oss@lupin.rocks>", "Roy Williams <rwilliams@lyft.com>"]
 readme = "README.md"
