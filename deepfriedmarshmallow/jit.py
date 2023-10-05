@@ -265,11 +265,15 @@ class UUIDInliner(FieldInliner):
         """Generates a template for inlining UUID serialization."""
         if is_overridden(field._serialize, marshmallow.fields.UUID._serialize):
             return None
-        result = "uuid.UUID({0})"
-        result += " if {0} is not None and isinstance({0}, str) else "
-        result += "({0} if {0} is not None and isinstance({0}, uuid.UUID) else None)"
         if not context.is_serializing:
+            result = "uuid.UUID({0})"
+            result += " if {0} is not None and isinstance({0}, str) else "
+            result += "({0} if {0} is not None and isinstance({0}, uuid.UUID) else None)"
             result = f"({result})" + " if (isinstance({0}, (uuid.UUID, str)) or {0} is None) else dict()['error']"
+        else:
+            result = "str({0})"
+            result += " if {0} is not None and isinstance({0}, (uuid.UUID, str)) else None"
+        print(result)
         return result, "uuid"
 
 
