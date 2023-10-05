@@ -1,4 +1,4 @@
-__version__ = "1.0.0dev3"
+__version__ = "1.0.0dev4"
 
 from deepfriedmarshmallow.import_patch import deep_fry_marshmallow
 from deepfriedmarshmallow.mixin import JitSchemaMixin
