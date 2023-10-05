@@ -1,9 +1,6 @@
 """Benchmark for Marshmallow serialization of a moderately complex object.
 
 """
-
-from __future__ import print_function, unicode_literals, division
-
 import argparse
 import cProfile
 import gc

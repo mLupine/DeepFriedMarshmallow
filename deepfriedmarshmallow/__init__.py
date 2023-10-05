@@ -1,61 +1,24 @@
-from marshmallow import Schema, ValidationError
-
-from .jit import JitContext, generate_deserialize_method, generate_serialize_method
-
 __version__ = "1.0.0dev3"
 
-
-class JitMethodWrapper:
-    def __init__(self, schema, method):
-        self._schema = schema
-        self._method = method
-
-        self._jit_method = None
-        self._prev_fields_dict = None
-
-    def __call__(self, obj, many=False, **kwargs):  # noqa: FBT002
-        self._ensure_jit_method()
-
-        try:
-            result = self._jit_method(obj, many=many)
-        except (ValidationError, KeyError, AttributeError, ValueError, TypeError):
-            result = self._method(obj, many=many, **kwargs)
-
-        return result
-
-    def _ensure_jit_method(self):
-        if self._jit_method is None:
-            self._jit_method = self.generate_jit_method(self._schema, JitContext())
-
-    def generate_jit_method(self, schema, context):
-        raise NotImplementedError
-
-    def __getattr__(self, item):
-        return getattr(self._method, item)
+from deepfriedmarshmallow.import_patch import deep_fry_marshmallow
+from deepfriedmarshmallow.mixin import JitSchemaMixin
+from deepfriedmarshmallow.serializer import JitSerialize, JitDeserialize
+from deepfriedmarshmallow.jit import JitContext, generate_method_bodies
 
 
-class JitSerialize(JitMethodWrapper):
-    def __init__(self, schema):
-        super().__init__(schema, schema._serialize)
+def __getattr__(name):
+    if name == "JitSchema":
+        if "JitSchema" not in globals() or not globals()["JitSchema"]:
+            from marshmallow import Schema
 
-    def generate_jit_method(self, schema, context):
-        return generate_serialize_method(schema, context)
+            from deepfriedmarshmallow.mixin import JitSchemaMixin
 
+            class _JitSchemaImpl(JitSchemaMixin, Schema):
+                pass
 
-class JitDeserialize(JitMethodWrapper):
-    def __init__(self, schema):
-        super().__init__(schema, schema._deserialize)
+            # Cache and return the created class
+            globals()["JitSchema"] = _JitSchemaImpl
+        return globals()["JitSchema"]
 
-    def generate_jit_method(self, schema, context):
-        return generate_deserialize_method(schema, context)
-
-
-class JitSchema(Schema):
-    jit_serialize_class = JitSerialize
-    jit_deserialize_class = JitDeserialize
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self._serialize = self.jit_serialize_class(self)
-        self._deserialize = self.jit_deserialize_class(self)
+    msg = f"module '{__name__}' has no attribute {name}"
+    raise AttributeError(msg)

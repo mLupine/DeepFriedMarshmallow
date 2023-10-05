@@ -3,10 +3,9 @@ import keyword
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
+from dataclasses import dataclass
 
 import attr
-from marshmallow import Schema, fields, missing
-from marshmallow.base import SchemaABC
 from six import add_metaclass, exec_, iteritems, string_types, text_type
 
 from .compat import is_overridden
@@ -14,6 +13,58 @@ from .utils import IndentedString
 
 # Regular Expression for identifying a valid Python identifier name.
 _VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+
+
+@dataclass
+class MarshmallowCacheStore:
+    _Schema = None
+    _SchemaABC = None
+    _fields = None
+    _missing = None
+
+    @property
+    def Schema(self) -> "marshmallow.Schema":  # noqa: N802
+        self._ensure_imported()
+        return self._Schema
+
+    @property
+    def SchemaABC(self) -> "marshmallow.base.SchemaABC":  # noqa: N802
+        self._ensure_imported()
+        return self._SchemaABC
+
+    @property
+    def fields(self) -> "marshmallow.fields":
+        self._ensure_imported()
+        return self._fields
+
+    @property
+    def missing(self) -> "marshmallow.missing":
+        self._ensure_imported()
+        return self._missing
+
+    def _ensure_imported(self) -> None:
+        if self._Schema is None:
+            from marshmallow import Schema
+
+            self._Schema = Schema
+
+        if self._SchemaABC is None:
+            from marshmallow.base import SchemaABC
+
+            self._SchemaABC = SchemaABC
+
+        if self._fields is None:
+            from marshmallow import fields
+
+            self._fields = fields
+
+        if self._missing is None:
+            from marshmallow import missing
+
+            self._missing = missing
+
+
+marshmallow = MarshmallowCacheStore()
 
 
 def field_symbol_name(field_name):
@@ -54,7 +105,7 @@ class FieldSerializer:
 
     @abstractmethod
     def serialize(self, attr_name, field_symbol, assignment_template, field_obj):
-        # type: (str, str, str, fields.Field) -> IndentedString
+        # type: (str, str, str, marshmallow.fields.Field) -> IndentedString
         """Generates the code to pull a field off of an object into the result.
 
         :param attr_name: The name of the attribute being accessed/
@@ -81,7 +132,7 @@ class InstanceSerializer(FieldSerializer):
     """
 
     def serialize(self, attr_name, field_symbol, assignment_template, field_obj):
-        # type: (str, str, str, fields.Field) -> IndentedString
+        # type: (str, str, str, marshmallow.fields.Field) -> IndentedString
         return IndentedString(assignment_template.format(attr_str(attr_name)))
 
 
@@ -101,7 +152,7 @@ class DictSerializer(FieldSerializer):
     """
 
     def serialize(self, attr_name, field_symbol, assignment_template, field_obj):
-        # type: (str, str, str, fields.Field) -> IndentedString
+        # type: (str, str, str, marshmallow.fields.Field) -> IndentedString
         body = IndentedString()
         if self.context.is_serializing:
             default_str = "dump_default"
@@ -112,7 +163,7 @@ class DictSerializer(FieldSerializer):
             if field_obj.required:
                 body += assignment_template.format(f'obj["{attr_name}"]')
                 return body
-        if default_value == missing:
+        if default_value == marshmallow.missing:
             body += f'if "{attr_name}" in obj:'
             with body.indent():
                 body += assignment_template.format(f'obj["{attr_name}"]')
@@ -143,7 +194,7 @@ class HybridSerializer(FieldSerializer):
     """
 
     def serialize(self, attr_name, field_symbol, assignment_template, field_obj):
-        # type: (str, str, str, fields.Field) -> IndentedString
+        # type: (str, str, str, marshmallow.fields.Field) -> IndentedString
         body = IndentedString()
         body += "try:"
         with body.indent():
@@ -159,11 +210,11 @@ class HybridSerializer(FieldSerializer):
 class JitContext:
     """Bag of properties to keep track of the context of what's being jitted."""
 
-    namespace = attr.ib(default={})  # type: Dict[str, Any]
+    namespace = attr.ib(default={})  # type: dict[str, Any]
     use_inliners = attr.ib(default=True)  # type: bool
-    schema_stack = attr.ib(default=attr.Factory(set))  # type: Set[str]
-    only = attr.ib(default=None)  # type: Optional[Set[str]]
-    exclude = attr.ib(default=set())  # type: Set[str]
+    schema_stack = attr.ib(default=attr.Factory(set))  # type: set[str]
+    only = attr.ib(default=None)  # type: Optional[set[str]]
+    exclude = attr.ib(default=set())  # type: set[str]
     is_serializing = attr.ib(default=True)  # type: bool
 
 
@@ -179,19 +230,19 @@ class FieldInliner:
 
     @abstractmethod
     def inline(self, field, context):
-        # type: (fields.Field, JitContext) -> Optional[str]
+        # type: (marshmallow.fields.Field, JitContext) -> Optional[str]
         pass  # pragma: no cover
 
 
 class StringInliner(FieldInliner):
     def inline(self, field, context):
-        # type: (fields.Field, JitContext) -> Optional[str]
+        # type: (marshmallow.fields.Field, JitContext) -> Optional[str]
         """Generates a template for inlining string serialization.
 
         For example, generates "unicode(value) if value is not None else None"
         to serialize a string in Python 2.7
         """
-        if is_overridden(field._serialize, fields.String._serialize):
+        if is_overridden(field._serialize, marshmallow.fields.String._serialize):
             return None
         result = text_type.__name__ + "({0})"
         result += " if {0} is not None else None"
@@ -209,7 +260,7 @@ class StringInliner(FieldInliner):
 
 class BooleanInliner(FieldInliner):
     def inline(self, field, context):
-        # type: (fields.Field, JitContext) -> Optional[str]
+        # type: (marshmallow.fields.Field, JitContext) -> Optional[str]
         """Generates a template for inlining boolean serialization.
 
         For example, generates:
@@ -221,7 +272,7 @@ class BooleanInliner(FieldInliner):
 
         This is somewhat fragile but it tracks what Marshmallow does.
         """
-        if is_overridden(field._serialize, fields.Boolean._serialize):
+        if is_overridden(field._serialize, marshmallow.fields.Boolean._serialize):
             return None
         truthy_symbol = f"__{field.name}_truthy"
         falsy_symbol = f"__{field.name}_falsy"
@@ -233,7 +284,7 @@ class BooleanInliner(FieldInliner):
 
 class NumberInliner(FieldInliner):
     def inline(self, field, context):
-        # type: (fields.Field, JitContext) -> Optional[str]
+        # type: (marshmallow.fields.Field, JitContext) -> Optional[str]
         """Generates a template for inlining string serialization.
 
         For example, generates "float(value) if value is not None else None"
@@ -241,8 +292,8 @@ class NumberInliner(FieldInliner):
         be coerced to a string if not None.
         """
         if (
-            is_overridden(field._validated, fields.Number._validated)
-            or is_overridden(field._serialize, fields.Number._serialize)
+            is_overridden(field._validated, marshmallow.fields.Number._validated)
+            or is_overridden(field._serialize, marshmallow.fields.Number._serialize)
             or field.num_type not in (int, float)
         ):
             return None
@@ -265,10 +316,10 @@ class NestedInliner(FieldInliner):  # pragma: no cover
         code expecting the context of nested schema to be populated on first
         access, so disabling for now.
         """
-        if is_overridden(field._serialize, fields.Nested._serialize):
+        if is_overridden(field._serialize, marshmallow.fields.Nested._serialize):
             return None
 
-        if not (isinstance(field.nested, type) and issubclass(field.nested, SchemaABC)):
+        if not (isinstance(field.nested, type) and issubclass(field.nested, marshmallow.SchemaABC)):
             return None
 
         if field.nested.__class__ in context.schema_stack:
@@ -314,23 +365,17 @@ class NestedInliner(FieldInliner):  # pragma: no cover
         return method_name + "({0}) if {0} is not None else None"
 
 
-INLINERS = {
-    fields.String: StringInliner(),
-    fields.Number: NumberInliner(),
-    fields.Boolean: BooleanInliner(),
-}
-
 EXPECTED_TYPE_TO_CLASS = {"object": InstanceSerializer, "dict": DictSerializer, "hybrid": HybridSerializer}
 
 
 def _should_skip_field(field_name, field_obj, context):
-    # type: (str, fields.Field, JitContext) -> bool
+    # type: (str, marshmallow.fields.Field, JitContext) -> bool
     load_only = getattr(field_obj, "load_only", False)
     dump_only = getattr(field_obj, "dump_only", False)
     # Marshmallow 2.x.x doesn't properly set load_only or
     # dump_only on Method objects.  This is fixed in 3.0.0
     # https://github.com/marshmallow-code/marshmallow/commit/1b676dd36cbb5cf040da4f5f6d43b0430684325c
-    if isinstance(field_obj, fields.Method):
+    if isinstance(field_obj, marshmallow.fields.Method):
         load_only = bool(field_obj.deserialize_method_name) and not bool(field_obj.serialize_method_name)
         dump_only = bool(field_obj.serialize_method_name) and not bool(field_obj.deserialize_method_name)
 
@@ -401,7 +446,7 @@ def generate_transform_method_body(schema, on_field, context):
                 # fields like 'Method' expect to have `None` passed in when
                 # invoking their _serialize method.
                 body += assignment_template.format("None")
-                context.namespace["__marshmallow_missing"] = missing
+                context.namespace["__marshmallow_missing"] = marshmallow.missing
                 body += f'if res["{result_key}"] is __marshmallow_missing:'
                 with body.indent():
                     body += f'del res["{result_key}"]'
@@ -444,7 +489,7 @@ def generate_transform_method_body(schema, on_field, context):
                     body += f'if __res_get("{result_key}", res) is None:'
                     with body.indent():
                         body += "raise ValueError()"
-                if field_obj.validators or is_overridden(field_obj._validate, fields.Field._validate):
+                if field_obj.validators or is_overridden(field_obj._validate, marshmallow.fields.Field._validate):
                     body += f'if "{result_key}" in res:'
                     with body.indent():
                         body += f'{field_symbol}__validate(res["{result_key}"])'
@@ -465,7 +510,7 @@ def _generate_fallback_access_template(context, field_name, field_obj, result_ke
 
 
 def _get_attr_and_destination(context, field_name, field_obj):
-    # type: (JitContext, str, fields.Field) -> Tuple[str, str]
+    # type: (JitContext, str, marshmallow.fields.Field) -> Tuple[str, str]
     # The name of the attribute to pull off the incoming object
     attr_name = field_name
     # The destination of the field in the result dictionary.
@@ -495,10 +540,16 @@ def _generate_inlined_access_template(inliner, key, no_callable_fields):
 
 
 def inliner_for_field(context, field_obj):
-    # type: (JitContext, fields.Field) -> Optional[str]
+    # type: (JitContext, marshmallow.fields.Field) -> Optional[str]
+    inliners = {
+        marshmallow.fields.String: StringInliner(),
+        marshmallow.fields.Number: NumberInliner(),
+        marshmallow.fields.Boolean: BooleanInliner(),
+    }
+
     if context.use_inliners:
         inliner = None
-        for field_type, inliner_class in iteritems(INLINERS):
+        for field_type, inliner_class in iteritems(inliners):
             if isinstance(field_obj, field_type):
                 inliner = inliner_class.inline(field_obj, context)
                 if inliner:
@@ -549,17 +600,14 @@ class SerializeProxy:
         # type: (Any) -> Any
         """Dispatcher which traces calls and specializes if possible."""
         try:
-            ret = None
             if isinstance(obj, Mapping):
                 self.dict_count += 1
-                ret = self.dict_serializer(obj)
-            elif hasattr(obj, "__getitem__"):
+                return self.dict_serializer(obj)
+            if hasattr(obj, "__getitem__"):
                 self.hybrid_count += 1
-                ret = self.hybrid_serializer(obj)
-            else:
-                self.instance_count += 1
-                ret = self.instance_serializer(obj)
-            return ret
+                return self.hybrid_serializer(obj)
+            self.instance_count += 1
+            return self.instance_serializer(obj)
         finally:
             non_zeros = [x for x in [self.dict_count, self.hybrid_count, self.instance_count] if x > 0]
             if len(non_zeros) > 1:
@@ -584,7 +632,7 @@ class SerializeProxy:
         return ret
 
 
-def generate_serialize_method(schema, context=missing, threshold=100):
+def generate_serialize_method(schema, context=None, threshold=100):
     # type: (Schema, JitContext, int) -> Union[SerializeProxy, Callable, None]
     """Generates a function to serialize objects for a given schema.
 
@@ -593,12 +641,15 @@ def generate_serialize_method(schema, context=missing, threshold=100):
         specializing the serialize method for that type.
     :return: A Callable that can be used to serialize objects for the schema
     """
-    if is_overridden(schema.get_attribute, Schema.get_attribute):
+    if context is None:
+        context = marshmallow.missing
+
+    if is_overridden(schema.get_attribute, marshmallow.Schema.get_attribute):
         # Bail if get_attribute is overridden.  This provides the schema author
         # too much control to reasonably JIT.
         return None
 
-    if context is missing:
+    if context is marshmallow.missing:
         context = JitContext()
 
     context.namespace = {}
@@ -626,10 +677,10 @@ def generate_serialize_method(schema, context=missing, threshold=100):
         namespace[field_symbol_name(key) + "__validate_missing"] = value._validate_missing
         namespace[field_symbol_name(key) + "__validate"] = value._validate
 
-        if value.dump_default is not missing:
+        if value.dump_default is not marshmallow.missing:
             namespace[field_symbol_name(key) + "__dump_default"] = value.dump_default
 
-        if value.load_default is not missing:
+        if value.load_default is not marshmallow.missing:
             namespace[field_symbol_name(key) + "__load_default"] = value.load_default
 
     exec_(result, namespace)
@@ -662,7 +713,7 @@ def generate_serialize_method(schema, context=missing, threshold=100):
     return serialize
 
 
-def generate_deserialize_method(schema, context=missing):
+def generate_deserialize_method(schema, context=None):
     context = context or JitContext()
     context.is_serializing = False
     return generate_serialize_method(schema, context)
