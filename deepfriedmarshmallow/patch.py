@@ -1,3 +1,5 @@
+from typing import Type
+
 from deepfriedmarshmallow.serializer import JitDeserialize, JitSerialize
 
 
@@ -10,7 +12,7 @@ def deep_fry_schema_object(schema: "marshmallow.Schema") -> None:
     schema.__doc__ = "Marshmallow module enhanced with Deep-Fried Marshmallow (via patch)"
 
 
-def deep_fry_schema(cls: type["marshmallow.Schema"]) -> None:
+def deep_fry_schema(cls: Type["marshmallow.Schema"]) -> None:
     """Patches a Marshmallow schema to support JIT compilation."""
     cls._is_jit = True
 
