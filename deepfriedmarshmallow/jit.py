@@ -230,7 +230,7 @@ class FieldInliner:
 
     @abstractmethod
     def inline(self, field, context):
-        # type: (marshmallow.fields.Field, JitContext) -> Optional[str]
+        # type: (marshmallow.fields.Field, JitContext) -> Optional[Union[str, tuple]]
         pass  # pragma: no cover
 
 
@@ -256,6 +256,21 @@ class StringInliner(FieldInliner):
                 + ')) or {0} is None) else dict()["error"]'
             )
         return result
+
+
+class UUIDInliner(FieldInliner):
+    def inline(self, field, context):
+        # type: (marshmallow.fields.Field, JitContext) -> Optional[tuple]
+
+        """Generates a template for inlining UUID serialization."""
+        if is_overridden(field._serialize, marshmallow.fields.UUID._serialize):
+            return None
+        result = "uuid.UUID({0})"
+        result += " if {0} is not None and isinstance({0}, str) else "
+        result += "({0} if {0} is not None and isinstance({0}, uuid.UUID) else None)"
+        if not context.is_serializing:
+            result = f"({result})" + " if (isinstance({0}, (uuid.UUID, str)) or {0} is None) else dict()['error']"
+        return result, "uuid"
 
 
 class BooleanInliner(FieldInliner):
@@ -395,6 +410,7 @@ def generate_transform_method_body(schema, on_field, context):
     """Generates the method body for a schema and a given field serialization
     strategy.
     """
+    required_imports = set()
     body = IndentedString()
     body += f"def {on_field.__class__.__name__}(obj):"
     with body.indent():
@@ -431,8 +447,11 @@ def generate_transform_method_body(schema, on_field, context):
             # Attempt to see if this field type can be inlined.
             inliner = inliner_for_field(context, field_obj)
 
-            if inliner:
+            if inliner and isinstance(inliner, str):
                 assignment_template += _generate_inlined_access_template(inliner, result_key, no_callable_fields)
+            elif inliner and isinstance(inliner, tuple):
+                assignment_template += _generate_inlined_access_template(inliner[0], result_key, no_callable_fields)
+                required_imports.update(inliner[1] if isinstance(inliner[1], (list, set, tuple)) else [inliner[1]])
 
             else:
                 assignment_template += _generate_fallback_access_template(
@@ -495,6 +514,8 @@ def generate_transform_method_body(schema, on_field, context):
                         body += f'{field_symbol}__validate(res["{result_key}"])'
 
         body += "return res"
+    if required_imports:
+        body = IndentedString("\n".join([f"import {x}" for x in required_imports]) + "\n" + str(body))
     return body
 
 
@@ -542,6 +563,7 @@ def _generate_inlined_access_template(inliner, key, no_callable_fields):
 def inliner_for_field(context, field_obj):
     # type: (JitContext, marshmallow.fields.Field) -> Optional[str]
     inliners = {
+        marshmallow.fields.UUID: UUIDInliner(),
         marshmallow.fields.String: StringInliner(),
         marshmallow.fields.Number: NumberInliner(),
         marshmallow.fields.Boolean: BooleanInliner(),

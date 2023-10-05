@@ -112,6 +112,8 @@ or extend custom Schema classes. To use it, just inherit from `JitSchemaMixin`.
 Let's take a look at the following example:
 
 ```python
+from marshmallow import fields
+
 class ClockSchema(MyAwesomeBaseSchema):
     time = fields.DateTime(data_key="Time")
 ```
