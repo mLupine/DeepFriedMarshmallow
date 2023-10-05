@@ -28,9 +28,7 @@ class MarshmallowImportReplacer:
         self.is_importing = False
 
         # Patch marshmallow module
-        new_module = self.patch_marshmallow_module(new_module)
-
-        return new_module
+        return self.patch_marshmallow_module(new_module)
 
     def exec_module(self, module):
         # No action needed here, as all actions are performed in create_module
@@ -45,7 +43,7 @@ class MarshmallowImportReplacer:
         from deepfriedmarshmallow import JitSchema
 
         module.Schema = JitSchema
-        module.__doc__ = "Marshmallow module enhanced with Deep-Fried Marshmallow"
+        module.__doc__ = "Marshmallow module enhanced with Deep-Fried Marshmallow (Schema class replacement)"
         return module
 
 

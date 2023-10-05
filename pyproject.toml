@@ -93,10 +93,11 @@ select = [
     "UP",
     "YTT",
 ]
-extend-ignore = ["BLE001", "PLR0912", "C901", "PGH003", "ARG002"]
+extend-ignore = ["BLE001", "PLR0912", "C901", "PGH003", "ARG002", "F821"]
 line-length = 120
 target-version = "py311"
 extend-exclude = [
     "tests/",
     "performance/",
+    "**/__init__.py",
 ]

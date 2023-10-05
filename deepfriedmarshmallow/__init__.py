@@ -1,9 +1,10 @@
 __version__ = "1.0.0dev4"
 
 from deepfriedmarshmallow.import_patch import deep_fry_marshmallow
-from deepfriedmarshmallow.mixin import JitSchemaMixin
-from deepfriedmarshmallow.serializer import JitSerialize, JitDeserialize
 from deepfriedmarshmallow.jit import JitContext, generate_method_bodies
+from deepfriedmarshmallow.mixin import JitSchemaMixin
+from deepfriedmarshmallow.patch import deep_fry_schema, deep_fry_schema_object
+from deepfriedmarshmallow.serializer import JitDeserialize, JitSerialize
 
 
 def __getattr__(name):

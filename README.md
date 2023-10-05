@@ -121,11 +121,50 @@ If you want to make this schema JIT-compatible, and don't want to modify the
 you can do the following:
 
 ```python
+from marshmallow import fields
 from deepfriedmarshmallow import JitSchemaMixin
 
 class ClockSchema(JitSchemaMixin, MyAwesomeBaseSchema):
     time = fields.DateTime(data_key="Time")
 ```
+
+### Patcher functions
+
+If all of the above wasn't enough, Deep-Fried Marshmallow also provides two
+more ways to patch Marshmallow schemas. Both of them are functions that you
+can call to patch either a Schema class, or a Schema instance. Let's take a
+look at the following example:
+
+```python
+from marshmallow import Schema, fields
+from deepfriedmarshmallow import deep_fry_schema
+
+class ArtistSchema(Schema):
+    name = fields.Str()
+
+deep_fry_schema(ArtistSchema)
+schema = ArtistSchema()
+```
+
+The `deep_fry_schema` function will patch the `AlbumSchema` class, and all
+instances of it will be JIT-compatible. If you want to patch a specific
+instance of a schema, you can use the `deep_fry_schema_object` function:
+
+```python
+from marshmallow import Schema, fields
+from deepfriedmarshmallow import deep_fry_schema_object
+
+class ArtistSchema(Schema):
+    name = fields.Str()
+
+schema = ArtistSchema()
+deep_fry_schema_object(schema)
+```
+
+This function will patch the `schema` object, and all dumps and loads will
+be JIT-compatible. This function is useful if you want to patch a schema
+that you don't have control over, for example, a schema that is provided
+by a third-party library.
 
 ## How it works
 
