@@ -86,6 +86,47 @@ schema = AlbumSchema()
 
 And that's it!
 
+### Auto-patching all Marshmallow schemas
+
+If you want to automatically patch all Marshmallow schemas in your project,
+Deep-Fried Marshmallow provides a helper function for that. Just call 
+`deepfriedmarshmallow.deep_fry_marshmallow()` before you start using 
+Marshmallow schemas, and you're all set. The upmost ``__init__.py`` file of
+your project is a good place to do that.
+
+```python
+# your_package/__init__.py
+from deepfriedmarshmallow import deep_fry_marshmallow
+
+deep_fry_marshmallow()
+```
+
+All imports of `marshmallow.Schema` will be automatically replaced with 
+`deepfriedmarshmallow.Schema` with no other changes to your code. Isn't that
+~~sweet~~ extra crispy?
+
+### Custom Schema classes
+
+Deep-Fried Marshmallow also provides a mixin class that you can use to create
+or extend custom Schema classes. To use it, just inherit from `JitSchemaMixin`.
+Let's take a look at the following example:
+
+```python
+class ClockSchema(MyAwesomeBaseSchema):
+    time = fields.DateTime(data_key="Time")
+```
+
+If you want to make this schema JIT-compatible, and don't want to modify the
+`MyAwesomeBaseSchema` class to inherit from `deepfriedmarshmallow.Schema`, 
+you can do the following:
+
+```python
+from deepfriedmarshmallow import JitSchemaMixin
+
+class ClockSchema(JitSchemaMixin, MyAwesomeBaseSchema):
+    time = fields.DateTime(data_key="Time")
+```
+
 ## How it works
 
 Deep-Fried Marshmallow works by generating code at runtime to optimize dumping
