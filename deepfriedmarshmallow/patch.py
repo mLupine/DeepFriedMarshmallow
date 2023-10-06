@@ -1,10 +1,15 @@
 from typing import Type
 
+from deepfriedmarshmallow.log import logger
 from deepfriedmarshmallow.serializer import JitDeserialize, JitSerialize
 
 
 def deep_fry_schema_object(schema: "marshmallow.Schema") -> None:
     """Patches a Marshmallow schema object to support JIT compilation."""
+    logger.info(
+        f"Deep-frying schema {schema.__name__} instance. Current schema is_jit status:"
+        f" {getattr(schema, '_is_jit', 'N/A')}"
+    )
     schema._is_jit = True
 
     schema._serialize = JitSerialize(schema)
@@ -14,6 +19,8 @@ def deep_fry_schema_object(schema: "marshmallow.Schema") -> None:
 
 def deep_fry_schema(cls: Type["marshmallow.Schema"]) -> None:
     """Patches a Marshmallow schema to support JIT compilation."""
+    logger.info(f"Deep-frying schema {cls.__name__}. Current schema is_jit status: {getattr(cls, '_is_jit', 'N/A')}")
+
     cls._is_jit = True
 
     super_init = cls.__init__

@@ -2,9 +2,12 @@ import importlib
 import sys
 import types
 
+from deepfriedmarshmallow.log import logger
+
 
 class MarshmallowImportReplacer:
     def __init__(self):
+        logger.debug("Marshmallow import hook created")
         # A flag to prevent recursive importing
         self.is_importing = False
 
@@ -14,6 +17,7 @@ class MarshmallowImportReplacer:
         return None
 
     def create_module(self, spec):
+        logger.debug("Marshmallow module created")
         # Set flag to avoid recursive importing
         self.is_importing = True
 
@@ -50,7 +54,9 @@ class MarshmallowImportReplacer:
 def deep_fry_marshmallow():
     if "marshmallow" in sys.modules:
         # Marshmallow has already been imported, update the existing module
+        logger.info("Marshmallow has already been imported, updating the existing module")
         sys.modules["marshmallow"] = MarshmallowImportReplacer.patch_marshmallow_module(sys.modules["marshmallow"])
     else:
         # Marshmallow has not been imported yet, insert the import hook
+        logger.info("Marshmallow has not been imported yet, inserting the import hook")
         sys.meta_path.insert(0, MarshmallowImportReplacer())
