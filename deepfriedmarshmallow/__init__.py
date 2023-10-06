@@ -1,4 +1,4 @@
-__version__ = "1.0.0beta1"
+__version__ = "1.0.0dev9"
 
 from deepfriedmarshmallow.import_patch import deep_fry_marshmallow
 from deepfriedmarshmallow.jit import JitContext, generate_method_bodies
