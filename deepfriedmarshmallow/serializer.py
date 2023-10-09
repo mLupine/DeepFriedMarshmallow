@@ -1,3 +1,5 @@
+import os
+
 from deepfriedmarshmallow.jit import (
     JitContext,
     generate_deserialize_method,
@@ -29,23 +31,29 @@ class JitMethodWrapper:
         return result
 
     def _ensure_jit_method(self):
-        if self._jit_method is None:
-            if "_dfm_jit_cache" not in globals():
-                globals()["_dfm_jit_cache"] = {}
+        if self._jit_method is not None:
+            return
 
-            cache_key = (
-                self._schema.__class__.__name__,
-                self._schema.many,
-                id(self._schema.__class__),
-                self._method.__name__,
-            )
-            if cache_key not in globals()["_dfm_jit_cache"]:
-                logger.debug(f"Generating JIT method {cache_key=}")
-                globals()["_dfm_jit_cache"][cache_key] = self.generate_jit_method(self._schema, JitContext())
-            else:
-                logger.debug(f"Using cached JIT method {cache_key}")
+        if os.getenv("DFM_CACHE_JIT", "false").lower() not in ("true", "1", "yes", "y", "on"):
+            self._jit_method = self.generate_jit_method(self._schema, JitContext())
+            return
 
-            self._jit_method = globals()["_dfm_jit_cache"][cache_key]
+        if "_dfm_jit_cache" not in globals():
+            globals()["_dfm_jit_cache"] = {}
+
+        cache_key = (
+            self._schema.__class__.__name__,
+            self._schema.many,
+            id(self._schema.__class__),
+            self._method.__name__,
+        )
+        if cache_key not in globals()["_dfm_jit_cache"]:
+            logger.debug(f"Generating JIT method {cache_key=}")
+            globals()["_dfm_jit_cache"][cache_key] = self.generate_jit_method(self._schema, JitContext())
+        else:
+            logger.debug(f"Using cached JIT method {cache_key}")
+
+        self._jit_method = globals()["_dfm_jit_cache"][cache_key]
 
     def generate_jit_method(self, schema, context):
         raise NotImplementedError
