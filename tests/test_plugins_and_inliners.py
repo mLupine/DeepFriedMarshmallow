@@ -1,0 +1,94 @@
+import os
+from enum import Enum
+
+from deepfriedmarshmallow import JitSchema, deep_fry_marshmallow
+from marshmallow import fields, Schema, post_load
+
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+
+def test_enum_list_roundtrip(monkeypatch):
+    try:
+        from marshmallow_enum import EnumField
+    except Exception:  # plugin optional
+        return
+
+    class S(JitSchema):
+        colors_by_value = fields.List(EnumField(Color, by_value=True))
+        colors_by_name = fields.List(EnumField(Color, by_value=False))
+
+    s = S()
+    data = {"colors_by_value": [1, 2], "colors_by_name": ["RED", "BLUE"]}
+    loaded = s.load(data)
+    assert loaded["colors_by_value"] == [Color.RED, Color.BLUE]
+    assert loaded["colors_by_name"] == [Color.RED, Color.BLUE]
+    dumped = s.dump(loaded)
+    assert dumped["colors_by_value"] == [1, 2]
+    assert dumped["colors_by_name"] == ["RED", "BLUE"]
+
+
+def test_dict_and_tuple_inliners():
+    class S(JitSchema):
+        m = fields.Dict(keys=fields.String(), values=fields.Integer())
+        t = fields.Tuple((fields.String(), fields.Integer()))
+
+    s = S()
+    inp = {"m": {"a": 1, "b": 2}, "t": ("x", 3)}
+    loaded = s.load(inp)
+    assert loaded["m"] == {"a": 1, "b": 2}
+    assert loaded["t"] == ("x", 3)
+    out = s.dump(loaded)
+    assert out["m"] == {"a": 1, "b": 2}
+    assert out["t"] == ["x", 3] or out["t"] == ("x", 3)
+
+
+def test_oneof_nested_functional(monkeypatch):
+    # Avoid plugin interference; we want vanilla compatibility here
+    monkeypatch.setenv("DFM_DISABLE_AUTO_PLUGINS", "1")
+    # Ensure marshmallow import is patched so all schemas are JIT
+    deep_fry_marshmallow()
+
+    class A:
+        def __init__(self, v):
+            self.v = v
+
+    class B:
+        def __init__(self, v):
+            self.v = v
+
+    class ASchema(Schema):
+        v = fields.Integer(required=True)
+
+        @post_load
+        def make(self, data, **kwargs):
+            return A(**data)
+
+    class BSchema(Schema):
+        v = fields.Integer(required=True)
+
+        @post_load
+        def make(self, data, **kwargs):
+            return B(**data)
+
+    # Use FastOneOf from our forked implementation
+    from marshmallow_fastoneofschema import OneOfSchema as BaseOneOf
+
+    class MyOneOf(BaseOneOf):
+        type_schemas = {"A": ASchema, "B": BSchema}
+
+    class Parent(JitSchema):
+        class Meta:
+            dfm = {"use_inliners": False}
+
+        items = fields.Nested(MyOneOf, many=True)
+
+    p = Parent()
+    arr = [{"type": "A", "v": 1}, {"type": "B", "v": 2}]
+    loaded = p.load({"items": arr})
+    assert isinstance(loaded["items"][0], A)
+    assert isinstance(loaded["items"][1], B)
+    # Dump should not error; content depends on plugin availability
+    p.dump(loaded)

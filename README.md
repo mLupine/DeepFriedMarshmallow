@@ -3,13 +3,13 @@
 
 I need to be honest with you — I have no idea how to compare the speed of a
 marshmallow and the speed of a chicken nugget. I really liked that headline,
-though, so let's just assume that a nugget is indeed faster than a 
-marshmallow. So is this project, Deep-Fried Marshmallow, faster than 
+though, so let's just assume that a nugget is indeed faster than a
+marshmallow. So is this project, Deep-Fried Marshmallow, faster than
 vanilla Marshmallow. Or, to be precise, it *makes* Marshmallow faster.
 
 Deep-Fried Marshmallow implements a JIT for Marshmallow that speeds up dumping
 objects 3-5x (depending on your schema). Deep-Fried Marshmallow allows you to
-have the great API that 
+have the great API that
 [Marshmallow](https://github.com/marshmallow-code/marshmallow) provides
 without having to sacrifice performance.
 ```
@@ -23,13 +23,32 @@ without having to sacrifice performance.
         Speed up for load: 4.53x
 ```
 
-Deep-Fried Marshmallow is a fork of the great 
+Deep-Fried Marshmallow is a fork of the great
 [Toasted Marshmallow](https://github.com/lyft/toasted-marshmallow) project that,
 sadly, has been abandoned for years. Deep-Fried Marshmallow introduces many
 changes that make it compatible with all latest versions of Marshmallow (3.13+).
 It also changes the way the library interacts with Marshmallow, which means
 that code of Marshmallow doesn't need to be forked and modified for the JIT
 magic to work. That's a whole new level of magic!
+
+## Plugin System
+
+Deep-Fried Marshmallow supports external plugins that can contribute field inliners or custom JIT behaviors without modifying DFM.
+
+- Environment controls:
+  - `DFM_DISABLE_AUTO_PLUGINS=1` disables entry-point discovery
+  - `DFM_PLUGINS=module:obj,...` registers additional plugins explicitly
+
+A plugin can be either:
+
+- A callable that, when invoked, performs registration via `register_field_inliner(...)` or `register_field_inliner_factory(...)`, or
+- A module/object exposing `dfm_register(registry)` which is called with the registry instance.
+
+See `marshmallow_oneofschema.dfm_plugin` in [Kalepa's Marshmallow-FastOneOfSchema](https://github.com/Kalepa/marshmallow-fastoneofschema) fork for a minimal example.
+
+### Per-schema Controls
+
+- Use `class Meta: jit_options = {...}` to configure JIT behavior. In addition, `class Meta: dfm = { 'use_inliners': True|False }` toggles whether field inliners are used for that schema.
 
 
 
@@ -89,8 +108,8 @@ And that's it!
 ### Auto-patching all Marshmallow schemas
 
 If you want to automatically patch all Marshmallow schemas in your project,
-Deep-Fried Marshmallow provides a helper function for that. Just call 
-`deepfriedmarshmallow.deep_fry_marshmallow()` before you start using 
+Deep-Fried Marshmallow provides a helper function for that. Just call
+`deepfriedmarshmallow.deep_fry_marshmallow()` before you start using
 Marshmallow schemas, and you're all set. The upmost ``__init__.py`` file of
 your project is a good place to do that.
 
@@ -101,7 +120,7 @@ from deepfriedmarshmallow import deep_fry_marshmallow
 deep_fry_marshmallow()
 ```
 
-All imports of `marshmallow.Schema` will be automatically replaced with 
+All imports of `marshmallow.Schema` will be automatically replaced with
 `deepfriedmarshmallow.Schema` with no other changes to your code. Isn't that
 ~~sweet~~ extra crispy?
 
@@ -119,7 +138,7 @@ class ClockSchema(MyAwesomeBaseSchema):
 ```
 
 If you want to make this schema JIT-compatible, and don't want to modify the
-`MyAwesomeBaseSchema` class to inherit from `deepfriedmarshmallow.Schema`, 
+`MyAwesomeBaseSchema` class to inherit from `deepfriedmarshmallow.Schema`,
 you can do the following:
 
 ```python
@@ -220,7 +239,7 @@ Deep-Fried Marshmallow will invoke the proper serializer based upon the input.
 
 Since Deep-Fried Marshmallow generates code at runtime, it's critical you
 re-use Schema objects. If you're creating a new Schema object every time you
-serialize or deserialize an object, you're likely to experience much worse 
+serialize or deserialize an object, you're likely to experience much worse
 performance.
 
 ## Special thanks to

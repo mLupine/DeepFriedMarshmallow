@@ -1,5 +1,6 @@
 import base64
 import keyword
+import os
 import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
@@ -8,11 +9,18 @@ from dataclasses import dataclass
 import attr
 from six import add_metaclass, exec_, iteritems, string_types, text_type
 
-from .compat import is_overridden
-from .utils import IndentedString
+from ..compat import is_overridden
+from ..utils import IndentedString
+from .plugins import iter_external_inliner_factories, iter_external_inliners
 
 # Regular Expression for identifying a valid Python identifier name.
 _VALID_IDENTIFIER = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*")
+
+# Field-level profiling controls
+FIELD_PROFILE_ENABLED = any(
+    os.getenv(v, "0").lower() in ("1", "true", "yes", "on") for v in ("DFM_FIELD_PROFILE", "DFM_PROFILE")
+)
+FIELD_PROFILE_STATS = {}
 
 
 @dataclass
@@ -28,7 +36,7 @@ class MarshmallowCacheStore:
         return self._Schema
 
     @property
-    def SchemaABC(self) -> "marshmallow.base.SchemaABC":  # noqa: N802
+    def SchemaABC(self) -> object:  # noqa: N802
         self._ensure_imported()
         return self._SchemaABC
 
@@ -49,9 +57,13 @@ class MarshmallowCacheStore:
             self._Schema = Schema
 
         if self._SchemaABC is None:
-            from marshmallow.base import SchemaABC
-
-            self._SchemaABC = SchemaABC
+            try:
+                # Marshmallow <4
+                from marshmallow.base import SchemaABC as _SchemaABC  # type: ignore
+            except Exception:
+                # Marshmallow >=4 no longer exposes SchemaABC
+                from marshmallow import Schema as _SchemaABC
+            self._SchemaABC = _SchemaABC
 
         if self._fields is None:
             from marshmallow import fields
@@ -59,9 +71,20 @@ class MarshmallowCacheStore:
             self._fields = fields
 
         if self._missing is None:
-            from marshmallow import missing
+            try:
+                from marshmallow import missing as _missing
+            except Exception:  # pragma: no cover - compatibility with Marshmallow 4
+                try:
+                    from marshmallow.utils import (
+                        missing as _missing,  # type: ignore[attr-defined]
+                    )
+                except Exception:
 
-            self._missing = missing
+                    class _MissingSentinel:
+                        pass
+
+                    _missing = _MissingSentinel()
+            self._missing = _missing
 
 
 marshmallow = MarshmallowCacheStore()
@@ -318,7 +341,7 @@ class NumberInliner(FieldInliner):
         result = field.num_type.__name__ + "({0})"
         if field.as_string and context.is_serializing:
             result = f"str({result})"
-        if field.allow_none is True or context.is_serializing:
+        if getattr(field, "allow_none", False) is True or context.is_serializing:
             # Only emit the Null checking code if nulls are allowed.  If they
             # aren't allowed casting `None` to an integer will throw and the
             # slow path will take over.
@@ -414,15 +437,19 @@ def generate_transform_method_body(schema, on_field, context):
     strategy.
     """
     required_imports = set()
+    if FIELD_PROFILE_ENABLED:
+        required_imports.add("time")
     body = IndentedString()
     body += f"def {on_field.__class__.__name__}(obj):"
     with body.indent():
-        if schema.dict_class is dict:
+        meta = getattr(schema.__class__, "Meta", None)
+        meta_ordered = bool(getattr(meta, "ordered", False)) if meta is not None else False
+        if schema.dict_class is dict and not meta_ordered:
             # Declaring dictionaries via `{}` is faster than `dict()` since it
             # avoids the global lookup.
             body += "res = {}"
         else:
-            # dict_class will be injected before `exec` is called.
+            # Use schema-provided dict_class (supports ordered schemas and custom mappings)
             body += "res = dict_class()"
         if not context.is_serializing:
             body += "__res_get = res.get"
@@ -449,6 +476,10 @@ def generate_transform_method_body(schema, on_field, context):
 
             # Attempt to see if this field type can be inlined.
             inliner = inliner_for_field(context, field_obj)
+
+            # Optional field-level profiling: start timer
+            if FIELD_PROFILE_ENABLED:
+                body += "__t0 = time.perf_counter()"
 
             if inliner and isinstance(inliner, str):
                 assignment_template += _generate_inlined_access_template(inliner, result_key, no_callable_fields)
@@ -502,12 +533,26 @@ def generate_transform_method_body(schema, on_field, context):
                     body += f'if "{result_key}" not in res:'
                     with body.indent():
                         body += serializer.serialize(field_obj.data_key, field_symbol, assignment_template, field_obj)
+
+            # Optional field-level profiling: record elapsed
+            if FIELD_PROFILE_ENABLED:
+                schema_name = schema.__class__.__name__
+                mode = "serialize" if context.is_serializing else "deserialize"
+                key_literal = f"{schema_name}|{mode}|{result_key}"
+                body += f"__rec = FIELD_PROFILE_STATS.get('{key_literal}')"
+                body += "if __rec is None:"
+                with body.indent():
+                    body += "FIELD_PROFILE_STATS['" + key_literal + "'] = [time.perf_counter() - __t0, 1]"
+                body += "else:"
+                with body.indent():
+                    body += "__rec[0] += (time.perf_counter() - __t0)"
+                    body += "__rec[1] += 1"
             if not context.is_serializing:
                 if field_obj.required:
                     body += f'if "{result_key}" not in res:'
                     with body.indent():
                         body += "raise ValueError()"
-                if field_obj.allow_none is not True:
+                if getattr(field_obj, "allow_none", False) is not True:
                     body += f'if __res_get("{result_key}", res) is None:'
                     with body.indent():
                         body += "raise ValueError()"
@@ -572,6 +617,16 @@ def inliner_for_field(context, field_obj):
         marshmallow.fields.Boolean: BooleanInliner(),
     }
 
+    # Allow external plugins to contribute additional inliners
+    try:  # pragma: no cover
+        for ftype, inliner_cls in iter_external_inliners():
+            try:
+                inliners[ftype] = inliner_cls()
+            except Exception:
+                continue
+    except Exception:
+        pass
+
     if context.use_inliners:
         inliner = None
         for field_type, inliner_class in iteritems(inliners):
@@ -579,6 +634,15 @@ def inliner_for_field(context, field_obj):
                 inliner = inliner_class.inline(field_obj, context)
                 if inliner:
                     break
+        if not inliner:
+            # Allow factory-based plugins to decide dynamically
+            try:  # pragma: no cover
+                for factory in iter_external_inliner_factories():
+                    inliner = factory(field_obj, context)
+                    if inliner:
+                        break
+            except Exception:
+                pass
         return inliner
     return None
 
@@ -681,6 +745,10 @@ def generate_serialize_method(schema, context=None, threshold=100):
     context.namespace["dict_class"] = lambda: schema.dict_class()  # pylint: disable=unnecessary-lambda
 
     jit_options = getattr(schema.opts, "jit_options", {})
+    # Optional per-schema DFM controls
+    dfm_opts = getattr(schema.opts, "dfm", None)
+    if isinstance(dfm_opts, dict) and "use_inliners" in dfm_opts:
+        context.use_inliners = bool(dfm_opts["use_inliners"])  # type: ignore[assignment]
 
     context.schema_stack.add(schema.__class__)
 
@@ -689,6 +757,9 @@ def generate_serialize_method(schema, context=None, threshold=100):
     context.schema_stack.remove(schema.__class__)
 
     namespace = context.namespace
+    # Expose profiling stats dict to generated methods if profiling enabled
+    if FIELD_PROFILE_ENABLED:
+        namespace["FIELD_PROFILE_STATS"] = FIELD_PROFILE_STATS
 
     for key, value in iteritems(schema.fields):
         if value.attribute and "." in value.attribute:
