@@ -39,7 +39,7 @@ def _inner_inliner(field_obj, context) -> str | tuple | None:
             return (f"{ref}({{0}}) if {{0}} is not None else None", mod)
         return (f"{ref}[{{0}}] if {{0}} is not None else None", mod)
 
-    for inliner_cls in (StringInliner, NumberInliner, BooleanInliner, UUIDInliner):
+    for inliner_cls in (UUIDInliner, StringInliner, NumberInliner, BooleanInliner):
         try:
             result = inliner_cls().inline(field_obj, context)
         except Exception:

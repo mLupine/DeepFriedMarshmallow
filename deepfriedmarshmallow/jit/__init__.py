@@ -810,6 +810,21 @@ def generate_serialize_method(schema, context=None, threshold=100):
 
 
 def generate_deserialize_method(schema, context=None):
+    """Generate a deserialization method with input-type guards.
+
+    For JITed deserialization we require a Mapping input when many=False.
+    If the input doesn't match, raise to trigger fallback to non-JIT which
+    will surface a proper marshmallow ValidationError.
+    """
     context = context or JitContext()
     context.is_serializing = False
-    return generate_serialize_method(schema, context)
+    deser = generate_serialize_method(schema, context)
+    if deser is None:
+        return None
+
+    def _guarded_deserialize(obj, many=False):  # noqa: FBT002
+        if not many and not isinstance(obj, Mapping):
+            raise ValueError("DFM: non-mapping input for deserialization")
+        return deser(obj, many=many)
+
+    return _guarded_deserialize

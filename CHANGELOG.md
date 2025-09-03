@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.1 (2025-09-03)
+
+### Fixed
+- Inliners: Prefer `UUIDInliner` over `StringInliner` in `List`, `Tuple`, and `Dict` plugins. This preserves UUID objects during deserialization instead of coercing them to strings.
+- Deserialization: Guard non-mapping inputs when `many=False` and fall back to Marshmallow for proper `ValidationError` messages.
+
+
 ## 1.1.0 (2025-09-03)
 
 ### Added
