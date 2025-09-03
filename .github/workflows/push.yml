@@ -4,33 +4,31 @@ on: [push]
 
 jobs:
   test:
-    name: "Tests (Python ${{ matrix.pyversion }})"
+    name: "Tests (Python ${{ matrix.name }})"
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        pyversion: ["3.8", "3.9", "3.10", "3.11"]
+        include:
+          - { name: "3.11", python: "3.11", tox: py311 }
+          - { name: "3.12", python: "3.12", tox: py312 }
+          - { name: "3.13", python: "3.13", tox: py313 }
     steps:
-      - name: "Checkout the code"
-        uses: actions/checkout@master
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: "Install Python ${{ matrix.pyversion }}"
-        uses: actions/setup-python@v4
+      - name: Setup Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
         with:
-          python-version: "${{ matrix.pyversion }}"
+          python-version: ${{ matrix.python }}
 
-      - name: "Install poetry"
+      - name: Install Poetry
         run: |
           curl -sSL https://install.python-poetry.org | python3 -
           echo "${HOME}/.local/bin" >> $GITHUB_PATH
 
-      - name: "Install dependencies"
-        run: |
-          poetry install --all-extras
+      - name: Install dependencies
+        run: poetry install --with dev
 
-      - name: "Run full test suite"
-        run: |
-          poetry run pytest tests/
-
-      - name: "Run benchmarks"
-        run: |
-          poetry run python performance/benchmark.py 
+      - name: Run tests via tox
+        run: poetry run tox -e ${{ matrix.tox }}
