@@ -1,7 +1,4 @@
-"""Plugin to inline marshmallow.fields.Constant with a bound symbol.
-
-Returns a symbol bound in the JIT namespace to avoid embedding large literals.
-"""
+"""Builtin inliner for marshmallow.fields.Constant."""
 
 from __future__ import annotations
 

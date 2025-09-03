@@ -73,11 +73,45 @@ def test_oneof_nested_functional(monkeypatch):
         def make(self, data, **kwargs):
             return B(**data)
 
-    # Use FastOneOf from our forked implementation
-    from marshmallow_fastoneofschema import OneOfSchema as BaseOneOf
+    class MyOneOf(Schema):
+        type_field = "type"
+        type_schemas = {"A": ASchema(), "B": BSchema()}
 
-    class MyOneOf(BaseOneOf):
-        type_schemas = {"A": ASchema, "B": BSchema}
+        def load(self, data, many=None, **kwargs):
+            many = self.many if many is None else bool(many)
+            if not many:
+                t = data.get(self.type_field)
+                d = {k: v for k, v in data.items() if k != self.type_field}
+                sch = self.type_schemas.get(t)
+                return sch.load(d, **kwargs)
+            res = []
+            for item in data:
+                t = item.get(self.type_field)
+                d = {k: v for k, v in item.items() if k != self.type_field}
+                res.append(self.type_schemas[t].load(d, **kwargs))
+            return res
+
+        def dump(self, obj, many=None, **kwargs):
+            many = self.many if many is None else bool(many)
+            if not many:
+                if isinstance(obj, A):
+                    out = self.type_schemas["A"].dump(obj, **kwargs)
+                    out[self.type_field] = "A"
+                    return out
+                out = self.type_schemas["B"].dump(obj, **kwargs)
+                out[self.type_field] = "B"
+                return out
+            res = []
+            for o in obj:
+                if isinstance(o, A):
+                    d = self.type_schemas["A"].dump(o, **kwargs)
+                    d[self.type_field] = "A"
+                    res.append(d)
+                else:
+                    d = self.type_schemas["B"].dump(o, **kwargs)
+                    d[self.type_field] = "B"
+                    res.append(d)
+            return res
 
     class Parent(JitSchema):
         class Meta:

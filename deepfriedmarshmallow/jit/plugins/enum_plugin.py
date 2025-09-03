@@ -1,7 +1,4 @@
-"""Builtin plugin to inline marshmallow-enum EnumField.
-
-Registered automatically when marshmallow_enum is available.
-"""
+"""Builtin inliner for marshmallow_enum.EnumField."""
 
 from __future__ import annotations
 

@@ -1,8 +1,4 @@
-"""Plugin to inline marshmallow.fields.Dict when inner key/value fields are inlinable.
-
-- Load: builds a dict comprehension applying inner inliners on keys/values.
-- Dump: same idea, relies on inliners operating symmetrically.
-"""
+"""Builtin inliner for marshmallow.fields.Dict."""
 
 from __future__ import annotations
 

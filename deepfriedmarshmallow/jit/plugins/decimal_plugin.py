@@ -1,3 +1,5 @@
+"""Builtin inliner for marshmallow.fields.Decimal (safe subset)."""
+
 from __future__ import annotations
 
 from contextlib import suppress
@@ -35,4 +37,3 @@ def _register() -> None:
 
 with suppress(Exception):
     _register()
-

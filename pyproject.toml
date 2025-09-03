@@ -37,7 +37,7 @@ coverage = "*"
 ruff = "*"
 black = "*"
 isort = "*"
-marshmallow-fastoneofschema = { git = "https://github.com/Kalepa/marshmallow-fastoneofschema" }
+tox = "*"
 
 [build-system]
 requires = ["poetry-core"]

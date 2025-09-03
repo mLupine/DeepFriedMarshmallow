@@ -13,6 +13,9 @@
 - Per-schema control: `class Meta: dfm = { 'use_inliners': True|False }` to enable/disable inliners.
 - Optional profiling: `DFM_PROFILE` / `DFM_FIELD_PROFILE` to gather hot spots.
 
+### Changed
+- Dropped support for Python 3.8–3.10; minimum supported version is now 3.11.
+
 ### Fixed
 - Logging in patcher uses a correct `__name__` field.
 

@@ -1,7 +1,4 @@
-"""Builtin plugin to inline marshmallow.fields.Nested by delegating to nested schema.
-
-This avoids Field._deserialize/_serialize overhead and benefits from JIT on the nested schema.
-"""
+"""Builtin inliner for marshmallow.fields.Nested."""
 
 from __future__ import annotations
 

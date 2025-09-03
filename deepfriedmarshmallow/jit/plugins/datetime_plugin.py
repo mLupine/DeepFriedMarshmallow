@@ -1,8 +1,4 @@
-"""Builtin plugin to inline marshmallow.fields.Date and DateTime using ISO format.
-
-Conservative fast path: uses Python's fromisoformat/isoformat; on incompatible input,
-JIT will raise and DFM falls back to slow path.
-"""
+"""Builtin inliner for marshmallow.fields.Date, DateTime, and Time (ISO)."""
 
 from __future__ import annotations
 

@@ -1,7 +1,4 @@
-"""Builtin plugin to inline marshmallow.fields.Raw as pass-through.
-
-Conservative: returns value as-is (or None). Validation errors will cause fallback.
-"""
+"""Builtin inliner for marshmallow.fields.Raw."""
 
 from __future__ import annotations
 

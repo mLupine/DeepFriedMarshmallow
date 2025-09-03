@@ -1,7 +1,4 @@
-"""Plugin to inline marshmallow.fields.Tuple with inlinable element fields.
-
-Builds a fixed-length tuple by applying element inliners positionally.
-"""
+"""Builtin inliner for marshmallow.fields.Tuple."""
 
 from __future__ import annotations
 

@@ -1,7 +1,4 @@
-"""Builtin plugin to inline marshmallow.fields.List of simple element types.
-
-Supported inner element types: String, Number(int/float), Boolean, UUID, EnumField.
-"""
+"""Builtin inliner for marshmallow.fields.List."""
 
 from __future__ import annotations
 
