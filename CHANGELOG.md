@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2 (2025-09-03)
+
+### Fixed
+- Deserialization: Properly handle `unknown=RAISE` in `JitDeserialize`
+
 ## 1.1.1 (2025-09-03)
 
 ### Fixed

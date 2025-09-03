@@ -1,4 +1,5 @@
 import os
+from collections.abc import Mapping
 
 from deepfriedmarshmallow.jit import (
     JitContext,
@@ -76,3 +77,25 @@ class JitDeserialize(JitMethodWrapper):
 
     def generate_jit_method(self, schema, context):
         return generate_deserialize_method(schema, context)
+
+    def __call__(self, obj, many=False, **kwargs):  # noqa: FBT002
+        # Respect unknown=RAISE semantics proactively: if input contains keys
+        # that are not part of the schema, bypass JIT and delegate to the
+        # original Marshmallow path so it can raise a proper ValidationError.
+        import marshmallow as _mm  # lazy import to avoid startup costore
+
+        if not many and isinstance(obj, Mapping) and _mm is not None:
+            unknown_opt = getattr(self._schema.opts, "unknown", None)
+            # Marshmallow 3 default is RAISE if not specified
+            is_raise = (unknown_opt is None) or (unknown_opt == getattr(_mm, "RAISE", "raise"))
+            if is_raise:
+                accepted = set(self._schema.fields.keys())
+                for f in self._schema.fields.values():
+                    data_key = getattr(f, "data_key", None)
+                    if data_key:
+                        accepted.add(data_key)
+                if any(k not in accepted for k in obj):
+                    # Skip JIT completely to let Marshmallow perform validation
+                    return self._method(obj, many=many, **kwargs)
+
+        return super().__call__(obj, many=many, **kwargs)
